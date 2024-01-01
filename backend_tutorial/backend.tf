@@ -1,5 +1,8 @@
 # リモートステートバケットを作成。
 resource "aws_s3_bucket" "terraform_state" {
+  # workspace名がdefaultのものだけ作成する。
+  count = terraform.workspace == "default" ? 1 : 0
+
   bucket = "hello-terraform-remote-state"
 
   lifecycle {
@@ -11,7 +14,9 @@ resource "aws_s3_bucket" "terraform_state" {
 
 # リモートステートバケットのバージョニングを有効化
 resource "aws_s3_bucket_versioning" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+  count = terraform.workspace == "default" ? 1 : 0
+
+  bucket = aws_s3_bucket.terraform_state[0].id
 
   versioning_configuration {
     status = "Enabled"
@@ -22,7 +27,9 @@ resource "aws_s3_bucket_versioning" "terraform_state" {
 
 # リモートステートバケットの、サーバーサイド暗号化
 resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+  count = terraform.workspace == "default" ? 1 : 0
+
+  bucket = aws_s3_bucket.terraform_state[0].id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -35,7 +42,9 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "terraform_state" 
 
 # リモートステートバケットのパブリックアクセスをブロック
 resource "aws_s3_bucket_public_access_block" "terraform_state" {
-  bucket = aws_s3_bucket.terraform_state.id
+  count = terraform.workspace == "default" ? 1 : 0
+
+  bucket = aws_s3_bucket.terraform_state[0].id
   block_public_acls = true
   block_public_policy = true
   ignore_public_acls = true
@@ -45,6 +54,7 @@ resource "aws_s3_bucket_public_access_block" "terraform_state" {
 
 # リモートステートのロックを管理するためのdynamoDBを作成
 resource "aws_dynamodb_table" "terraform-locks" {
+  count = terraform.workspace == "default" ? 1 : 0
   name = "hello-terraform-remote-state-locks"
   billing_mode = "PAY_PER_REQUEST"
   hash_key = "LockID"
@@ -86,12 +96,14 @@ terraform {
 
 
 output "s3_bucket_arn" {
-  value = aws_s3_bucket.terraform_state.arn
+  # valueで指定したものがcountなどで存在しない可能性がある場合は、このような記述すれば、存在している場合だけoutputを作成できる。
+  value = one(aws_s3_bucket.terraform_state[*].arn)
   description = "The ARN of the S3 bucket"
 }
 
 output "dynamodb_table_name" {
-  value = aws_dynamodb_table.terraform-locks.name
+  # valueで指定したものがcountなどで存在しない可能性がある場合は、このような記述すれば、存在している場合だけoutputを作成できる。
+  value = one(aws_dynamodb_table.terraform-locks[*].name)
   description = "The name of the Dynamo table"
   
 }
